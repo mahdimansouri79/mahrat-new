@@ -67,6 +67,63 @@ export default function RegisterPage() {
 
   loadCourses();
 }, []);
+  const compressImage = (file: File, maxSizeKB = 200): Promise<File> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      if (!e.target?.result) return reject("خطا در خواندن فایل");
+      img.src = e.target.result as string;
+    };
+
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      const maxWidth = 800;
+
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth) {
+        height = (maxWidth / width) * height;
+        width = maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      ctx?.drawImage(img, 0, 0, width, height);
+
+      let quality = 0.9;
+
+      const compress = () => {
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return reject("خطا در فشرده سازی");
+
+            if (blob.size / 1024 > maxSizeKB && quality > 0.1) {
+              quality -= 0.1;
+              compress();
+            } else {
+              const newFile = new File([blob], file.name, {
+                type: "image/jpeg",
+              });
+              resolve(newFile);
+            }
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+
+      compress();
+    };
+
+    reader.readAsDataURL(file);
+  });
+};
 
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -90,7 +147,8 @@ export default function RegisterPage() {
       const priority2 = (formData.get("priority2") as string)?.trim();
       const priority3 = (formData.get("priority3") as string)?.trim();
       const experience = (formData.get("experience") as string)?.trim();
-
+      const serviceUnit = formData.get("serviceUnit");
+      const needDormitory = formData.get("needDormitory") === "on";   
       const bDay = (formData.get("bDay") as string)?.trim();
       const bMonth = (formData.get("bMonth") as string)?.trim();
       const bYear = (formData.get("bYear") as string)?.trim();
@@ -98,7 +156,8 @@ export default function RegisterPage() {
       const dispatchMonth = (formData.get("dispatchMonth") as string)?.trim();
       const dispatchYear = (formData.get("dispatchYear") as string)?.trim();
 
-      const photo = formData.get("photo") as File | null;
+      let photo = formData.get("photo") as File | null;
+
 
       // اعتبارسنجی عکس
       if (!photo || photo.size === 0) {
@@ -107,6 +166,7 @@ export default function RegisterPage() {
         setLoading(false);
         return;
       }
+      photo = await compressImage(photo, 200);
 
       // اعتبارسنجی کد ملی
       if (!nationalId || nationalId.length !== 10) {
@@ -139,6 +199,19 @@ export default function RegisterPage() {
 
       const fileName = `photo.${safeExt}`;
       const filePath = `${nationalId}/${fileName}`;
+
+      const { data: existingUser } = await supabase
+        .from("users")
+        .select("id")
+        .eq("national_id", nationalId)
+        .maybeSingle();
+
+      if (existingUser) {
+        setError("با این کد ملی قبلاً ثبت نام انجام شده است");
+        setLoading(false);
+        return;
+      }
+
 
       // آپلود عکس در storage
       const { error: uploadError } = await supabase.storage
@@ -173,6 +246,8 @@ export default function RegisterPage() {
         priority2: priority2 || null,
         priority3: priority3 || null,
         experience,
+        service_unit: serviceUnit || null,
+        need_dormitory: needDormitory,
         photo_path: filePath,
         created_at: new Date().toISOString(),
       };
@@ -452,6 +527,35 @@ export default function RegisterPage() {
                   className="w-full min-h-[150px] rounded-2xl border-2 border-slate-200 p-4 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all placeholder:text-slate-300"
                   placeholder="اگر قبلاً دوره‌ای گذرانده‌اید یا سابقه کاری در رشته‌های فنی دارید، اینجا به طور کامل بنویسید..."
                 />
+              </div>
+                {/* بخش هفتم: سوابق مهارتی */}
+             
+
+              {/* بخش جدید: یگان خدمتی و خوابگاه */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="label">یگان خدمتی</label>
+                  <select name="serviceUnit" className="input">
+                    <option value="">انتخاب یگان...</option>
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>
+                        یگان {n}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                      <label className="label">  </label>
+                <div className="flex items-center gap-3 bg-slate-50 border-2 border-slate-200 rounded-2xl px-4 h-[60px]">
+                  
+                  <input
+                    type="checkbox"
+                    name="needDormitory"
+                    className="w-5 h-5 accent-indigo-600 cursor-pointer"
+                  />
+                  <label className="text-sm font-bold text-slate-700 cursor-pointer">
+                    نیاز به خوابگاه
+                  </label>
+                </div>
               </div>
 
               {/* بخش هشتم: آپلود عکس پرسنلی */}

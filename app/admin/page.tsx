@@ -35,8 +35,13 @@ type UserType = {
   priority2?: string;
   priority3?: string;
   address?: string;
+  service_unit?: string;
+  degree?: string;
+  major?: string;
+  need_dormitory?: boolean;
   created_at: string;
 };
+
 
 type CourseType = {
   id: string;
@@ -101,6 +106,18 @@ export default function AdminPage() {
 
     setLoading(false);
   };
+  const serviceUnitMap: Record<string, string> = {
+  "1": "کارت سبز",
+  "2": "آموزشی",
+  "3": "سپاه ثارالله",
+  "4": "لشکر ۴۱",
+  "5": "فاوا قدس",
+  "6": "آمادگاه شهید باهنر",
+  "7": "تیپ ۳۸ ذوالفقار",
+  "8": "تیپ تکاور صاحب الزمان سیرجان",
+  "9": "گروه موشکی توپخانه ۶۵ رفسنجان",
+  "10": "گروه امام حسین",
+};
 
   // گرفتن دوره‌ها
   const loadCourses = async () => {
@@ -233,6 +250,29 @@ export default function AdminPage() {
     setEditingUser(user);
     setEditForm(user);
   };
+  //پاک کردن تمامی افراد
+    const deleteAllUsers = async () => {
+  const confirmDelete = confirm(
+    "آیا مطمئن هستید که می‌خواهید تمام اطلاعات کاربران حذف شود؟ این عمل قابل بازگشت نیست."
+  );
+
+  if (!confirmDelete) return;
+
+  const { error } = await supabase
+    .from("users")
+    .delete()
+    .neq("id", "0");
+
+  if (error) {
+    alert("خطا در حذف اطلاعات");
+    console.error(error);
+    return;
+  }
+
+  alert("تمام اطلاعات کاربران حذف شد");
+
+  setUsers([]); // خالی شدن لیست در صفحه
+};
 
   // ذخیره ادیت
   const saveEditUser = async () => {
@@ -255,7 +295,10 @@ export default function AdminPage() {
         priority2: editForm.priority2,
         priority3: editForm.priority3,
         address: editForm.address,
+        service_unit: editForm.service_unit,
+        need_dormitory: editForm.need_dormitory,
       })
+
       .eq("id", editingUser.id);
 
     setSavingEdit(false);
@@ -279,13 +322,16 @@ export default function AdminPage() {
       "نام پدر": user.father_name || "",
       "کد ملی": user.national_id || "",
       "شماره تماس": user.phone || "",
-      "رشته تحصیلی": user.education || "",
+      "مدرک تحصیلی": user.degree || "",
+     "رشته تحصیلی": user.major || "",
       "تاریخ تولد": user.birth_date || "",
       "تاریخ اعزام": user.dispatch_date || "",
       "اولویت 1": user.priority1 || "",
       "اولویت 2": user.priority2 || "",
       "اولویت 3": user.priority3 || "",
       "آدرس / شهر": user.address || "",
+      "یگان خدمتی": serviceUnitMap[user.service_unit ?? ""] || "",
+      "نیاز به خوابگاه": user.need_dormitory ? "بله" : "خیر",
       "تاریخ ثبت": user.created_at
         ? new Date(user.created_at).toLocaleDateString("fa-IR")
         : "",
@@ -420,6 +466,12 @@ export default function AdminPage() {
             >
               <RefreshCcw size={18} />
               بروزرسانی
+            </button>
+              <button
+              onClick={deleteAllUsers}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl"
+            >
+              حذف تمام کاربران
             </button>
 
             <button
@@ -570,6 +622,8 @@ export default function AdminPage() {
                     <th className="p-4 text-right">کد ملی</th>
                     <th className="p-4 text-right">دوره</th>
                     <th className="p-4 text-right">شهر</th>
+                    <th className="p-4 text-right">یگان</th>
+                    <th className="p-4 text-right">خوابگاه</th>
                     <th className="p-4 text-right">تاریخ ثبت</th>
                     <th className="p-4 text-right">عملیات</th>
                   </tr>
@@ -577,13 +631,13 @@ export default function AdminPage() {
                 <tbody className="divide-y">
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="text-center p-6 text-gray-400">
+                      <td colSpan={8} className="text-center p-6 text-gray-400">
                         در حال بارگذاری...
                       </td>
                     </tr>
                   ) : paginatedUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center p-6 text-gray-400">
+                      <td colSpan={8} className="text-center p-6 text-gray-400">
                         کاربری یافت نشد
                       </td>
                     </tr>
@@ -596,6 +650,20 @@ export default function AdminPage() {
                         <td className="p-4">{user.national_id}</td>
                         <td className="p-4">{user.priority1 || "-"}</td>
                         <td className="p-4">{user.address || "-"}</td>
+                        <td className="p-4">
+                          {user.service_unit ? `یگان ${user.service_unit}` : "-"}
+                        </td>
+                        <td className="p-4">
+                          {user.need_dormitory ? (
+                            <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700">
+                              بله
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-500">
+                              خیر
+                            </span>
+                          )}
+                        </td>
                         <td className="p-4 text-gray-500">
                           {user.created_at
                             ? new Date(user.created_at).toLocaleDateString("fa-IR")
@@ -808,7 +876,7 @@ export default function AdminPage() {
                   placeholder="تاریخ اعزام"
                   className="border rounded-xl px-3 py-2"
                 />
-
+  
                 <select
                   value={editForm.priority1 || ""}
                   onChange={(e) =>
@@ -841,7 +909,34 @@ export default function AdminPage() {
                   placeholder="اولویت 3"
                   className="border rounded-xl px-3 py-2"
                 />
+                <select
+                  value={editForm.service_unit || ""}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, service_unit: e.target.value })
+                  }
+                  className="border rounded-xl px-3 py-2"
+                >
+                  <option value="">انتخاب یگان خدمتی</option>
+                  {Array.from({ length: 10 }, (_, i) => i + 1).map((unit) => (
+                    <option key={unit} value={unit}>
+                      یگان {unit}
+                    </option>
+                  ))}
+                </select>
 
+                <label className="flex items-center gap-3 border rounded-xl px-3 py-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editForm.need_dormitory)}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, need_dormitory: e.target.checked })
+                    }
+                    className="w-5 h-5 accent-blue-600"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    نیاز به خوابگاه
+                  </span>
+                </label>
                 <input
                   value={editForm.address || ""}
                   onChange={(e) =>
